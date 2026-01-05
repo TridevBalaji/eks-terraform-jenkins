@@ -1,0 +1,108 @@
+pipeline {
+    agent any
+
+    parameters {
+        choice(
+            name: 'ACTION',
+            choices: ['plan', 'apply', 'destroy'],
+            description: 'Choose Terraform action'
+        )
+
+        string(
+            name: 'DESIRED_CAPACITY',
+            defaultValue: '2',
+            description: 'EKS worker node desired capacity'
+        )
+    }
+
+    environment {
+        AWS_DEFAULT_REGION = 'ap-south-1'
+    }
+
+    options {
+        timestamps()
+        ansiColor('xterm')
+    }
+
+    stages {
+
+        stage('Checkout Code from GitHub') {
+            steps {
+                git branch: 'main',
+                    url: 'https://github.com/<YOUR_GITHUB_USERNAME>/eks-terraform-jenkins.git'
+            }
+        }
+
+        stage('Terraform Version Check') {
+            steps {
+                sh 'terraform version'
+            }
+        }
+
+        stage('Trivy Scan - Terraform Security') {
+            steps {
+                sh '''
+                  echo "Running Trivy IaC Scan..."
+                  trivy config . --severity HIGH,CRITICAL
+                '''
+            }
+        }
+
+        stage('Terraform Init') {
+            steps {
+                sh 'terraform init'
+            }
+        }
+
+        stage('Terraform Plan') {
+            when {
+                expression { params.ACTION == 'plan' || params.ACTION == 'apply' }
+            }
+            steps {
+                sh """
+                  terraform plan \
+                  -var="desired_capacity=${params.DESIRED_CAPACITY}"
+                """
+            }
+        }
+
+        stage('Terraform Apply') {
+            when {
+                expression { params.ACTION == 'apply' }
+            }
+            steps {
+                sh """
+                  terraform apply -auto-approve \
+                  -var="desired_capacity=${params.DESIRED_CAPACITY}"
+                """
+            }
+        }
+
+        stage('Terraform Destroy') {
+            when {
+                expression { params.ACTION == 'destroy' }
+            }
+            steps {
+                sh 'terraform destroy -auto-approve'
+            }
+        }
+
+        stage('Terraform Outputs') {
+            when {
+                expression { params.ACTION == 'apply' }
+            }
+            steps {
+                sh 'terraform output'
+            }
+        }
+    }
+
+    post {
+        success {
+            echo '✅ Jenkins Terraform pipeline completed successfully'
+        }
+        failure {
+            echo '❌ Jenkins Terraform pipeline failed'
+        }
+    }
+}
