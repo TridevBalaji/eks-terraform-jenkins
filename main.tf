@@ -1,5 +1,3 @@
-
-
 data "aws_vpc" "default" {
   default = true
 }
@@ -8,6 +6,11 @@ data "aws_subnets" "default" {
   filter {
     name   = "vpc-id"
     values = [data.aws_vpc.default.id]
+  }
+
+  filter {
+    name   = "state"
+    values = ["available"]
   }
 }
 
@@ -23,9 +26,9 @@ module "eks" {
 
   eks_managed_node_groups = {
     nodes = {
-      desired_size = var.desired_capacity
-      min_size     = var.min_capacity
-      max_size     = var.max_capacity
+      desired_size   = var.desired_capacity
+      min_size       = var.min_capacity
+      max_size       = var.max_capacity
       instance_types = var.node_instance_type
     }
   }
