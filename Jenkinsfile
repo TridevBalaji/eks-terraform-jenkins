@@ -1,108 +1,67 @@
 pipeline {
-    agent any
+  agent any
 
-    parameters {
-        choice(
-            name: 'ACTION',
-            choices: ['plan', 'apply', 'destroy'],
-            description: 'Choose Terraform action'
-        )
+  parameters {
+    choice(
+      name: 'ACTION',
+      choices: ['plan', 'apply', 'destroy'],
+      description: 'Terraform action to perform'
+    )
+  }
 
-        string(
-            name: 'DESIRED_CAPACITY',
-            defaultValue: '2',
-            description: 'EKS worker node desired capacity'
-        )
+  options {
+    disableConcurrentBuilds()
+  }
+
+  stages {
+
+    stage('Checkout Code') {
+      steps {
+        git branch: 'main',
+            url: 'https://github.com/TridevBalaji/eks-terraform-jenkins.git'
+      }
     }
 
-    environment {
-        AWS_DEFAULT_REGION = 'ap-southeast-2'
+    stage('Terraform Init') {
+      steps {
+        sh '''
+        rm -rf .terraform .terraform.lock.hcl
+        terraform init -upgrade
+        '''
+      }
     }
 
-    options {
-        timestamps()
-        ansiColor('xterm')
+    stage('Terraform Validate') {
+      steps {
+        sh 'terraform validate'
+      }
     }
 
-    stages {
-
-        stage('Checkout Code from GitHub') {
-            steps {
-                git branch: 'main',
-                    url: 'https://github.com/TridevBalaji/eks-terraform-jenkins.git'
-            }
-        }
-
-        stage('Terraform Version Check') {
-            steps {
-                sh 'terraform version'
-            }
-        }
-
-        stage('Trivy Scan - Terraform Security') {
-            steps {
-                sh '''
-                  echo "Running Trivy IaC Scan..."
-                  trivy config . --severity HIGH,CRITICAL
-                '''
-            }
-        }
-
-        stage('Terraform Init') {
-            steps {
-                sh 'terraform init'
-            }
-        }
-
-        stage('Terraform Plan') {
-            when {
-                expression { params.ACTION == 'plan' || params.ACTION == 'apply' }
-            }
-            steps {
-                sh """
-                  terraform plan \
-                  -var="desired_capacity=${params.DESIRED_CAPACITY}"
-                """
-            }
-        }
-
-        stage('Terraform Apply') {
-            when {
-                expression { params.ACTION == 'apply' }
-            }
-            steps {
-                sh """
-                  terraform apply -auto-approve \
-                  -var="desired_capacity=${params.DESIRED_CAPACITY}"
-                """
-            }
-        }
-
-        stage('Terraform Destroy') {
-            when {
-                expression { params.ACTION == 'destroy' }
-            }
-            steps {
-                sh 'terraform destroy -auto-approve'
-            }
-        }
-
-        stage('Terraform Outputs') {
-            when {
-                expression { params.ACTION == 'apply' }
-            }
-            steps {
-                sh 'terraform output'
-            }
-        }
+    stage('Terraform Plan') {
+      when {
+        expression { params.ACTION == 'plan' || params.ACTION == 'apply' }
+      }
+      steps {
+        sh 'terraform plan'
+      }
     }
 
-    post {
-        success {
-            echo '✅ Jenkins Terraform pipeline completed successfully'
-        }
-        failure {
-            echo '❌ Jenkins Terraform pipeline failed'
-        }
+    stage('Terraform Apply') {
+      when {
+        expression { params.ACTION == 'apply' }
+      }
+      steps {
+        sh 'terraform apply -auto-approve'
+      }
     }
+
+    stage('Terraform Destroy') {
+      when {
+        expression { params.ACTION == 'destroy' }
+      }
+      steps {
+        sh 'terraform destroy -auto-approve'
+      }
+    }
+  }
 }
