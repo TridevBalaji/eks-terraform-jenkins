@@ -16,7 +16,7 @@ pipeline {
     }
 
     environment {
-        AWS_DEFAULT_REGION = 'ap-south-1'
+        AWS_DEFAULT_REGION = 'ap-southeast-2'
     }
 
     options {
@@ -29,7 +29,7 @@ pipeline {
         stage('Checkout Code from GitHub') {
             steps {
                 git branch: 'main',
-                    url: 'https://github.com/<YOUR_GITHUB_USERNAME>/eks-terraform-jenkins.git'
+                    url: 'https://github.com/TridevBalaji/eks-terraform-jenkins.git'
             }
         }
 
